@@ -64,7 +64,7 @@ public class PingPongClientHandler extends SimpleChannelInboundHandler<Object> {
         WebSocketFrame frame = (WebSocketFrame) msg;
         if (frame instanceof TextWebSocketFrame) {
             TextWebSocketFrame textFrame = (TextWebSocketFrame) frame;
-            System.out.println("Received message: " + textFrame.text());
+            System.out.println("Received message: " + textFrame.text());            
         } else if (frame instanceof PongWebSocketFrame) {
             System.out.println("Received pong");
         } else if (frame instanceof CloseWebSocketFrame) {

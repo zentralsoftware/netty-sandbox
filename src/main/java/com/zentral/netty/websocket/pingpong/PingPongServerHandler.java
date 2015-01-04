@@ -27,129 +27,140 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.util.CharsetUtil;
 
-import java.net.URI;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zentral.netty.websocket.WebSocketServerIndexPage;
 
 public class PingPongServerHandler extends SimpleChannelInboundHandler<Object> {
-	
-    private static final String WEBSOCKET_PORT = "8000";
-    private static final String WEBSOCKET_PATH = "/websocket";
 
-    private WebSocketServerHandshaker handshaker;
-    private boolean useSSL;
-    
-    public PingPongServerHandler(boolean useSSL)
-    {
-    	this.useSSL = useSSL;
-    }
-        
-    @Override
-    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (msg instanceof FullHttpRequest) {
-            handleHttpRequest(ctx, (FullHttpRequest) msg);
-        } else if (msg instanceof WebSocketFrame) {
-            handleWebSocketFrame(ctx, (WebSocketFrame) msg);
-        }
-    }
+	private static final String WEBSOCKET_PORT = "8000";
+	private static final String WEBSOCKET_PATH = "/websocket";
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) {
-        ctx.flush();
-    }
+	private WebSocketServerHandshaker handshaker;
+	private boolean useSSL;
 
-    private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
-        // Handle a bad request.
-        if (!req.getDecoderResult().isSuccess()) {
-            sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, BAD_REQUEST));
-            return;
-        }
+	public PingPongServerHandler(boolean useSSL)
+	{
+		this.useSSL = useSSL;
+	}
 
-        // Allow only GET methods.
-        if (req.getMethod() != GET) {
-            sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, FORBIDDEN));
-            return;
-        }
+	@Override
+	public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+		if (msg instanceof FullHttpRequest) {
+			handleHttpRequest(ctx, (FullHttpRequest) msg);
+		} else if (msg instanceof WebSocketFrame) {
+			handleWebSocketFrame(ctx, (WebSocketFrame) msg);
+		}
+	}
 
-        // Send the demo page and favicon.ico
-        if ("/".equals(req.getUri())) {
-            ByteBuf content = WebSocketServerIndexPage.getContent(getWebSocketLocation(req));
-            FullHttpResponse res = new DefaultFullHttpResponse(HTTP_1_1, OK, content);
+	@Override
+	public void channelReadComplete(ChannelHandlerContext ctx) {
+		ctx.flush();
+	}
 
-            res.headers().set(CONTENT_TYPE, "text/html; charset=UTF-8");
-            HttpHeaders.setContentLength(res, content.readableBytes());
+	private void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
+		// Handle a bad request.
+		if (!req.getDecoderResult().isSuccess()) {
+			sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, BAD_REQUEST));
+			return;
+		}
 
-            sendHttpResponse(ctx, req, res);
-            return;
-        }
-        if ("/favicon.ico".equals(req.getUri())) {
-            FullHttpResponse res = new DefaultFullHttpResponse(HTTP_1_1, NOT_FOUND);
-            sendHttpResponse(ctx, req, res);
-            return;
-        }
+		// Allow only GET methods.
+		if (req.getMethod() != GET) {
+			sendHttpResponse(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, FORBIDDEN));
+			return;
+		}
 
-        // Handshake
-        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(
-                getWebSocketLocation(req), null, true);
-        handshaker = wsFactory.newHandshaker(req);
-        if (handshaker == null) {
-            WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
-        } else {
-            handshaker.handshake(ctx.channel(), req).sync();
-            System.out.println("Server accept handshake");
-        	String originator = req.headers().get(Constants.HTTP_HEADER_X_RIKIT_ORIGINATOR);
-        	URI uri = new URI(originator);
-        	Store.getMapInstance().put(uri, ctx);
-        }
-    }
+		// Send the demo page and favicon.ico
+		if ("/".equals(req.getUri())) {
+			ByteBuf content = WebSocketServerIndexPage.getContent(getWebSocketLocation(req));
+			FullHttpResponse res = new DefaultFullHttpResponse(HTTP_1_1, OK, content);
 
-    private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame) {
+			res.headers().set(CONTENT_TYPE, "text/html; charset=UTF-8");
+			HttpHeaders.setContentLength(res, content.readableBytes());
 
-        // Check for closing frame
-        if (frame instanceof CloseWebSocketFrame) {
-            handshaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain());
-            return;
-        }
-        if (frame instanceof PingWebSocketFrame) {
-            System.out.println("WebSocket Server received ping");
-            ctx.channel().write(new PongWebSocketFrame(frame.content().retain()));
-            return;
-        }
-        if (!(frame instanceof TextWebSocketFrame)) {
-            throw new UnsupportedOperationException(String.format("%s frame types not supported", frame.getClass()
-                    .getName()));
-        }
+			sendHttpResponse(ctx, req, res);
+			return;
+		}
+		if ("/favicon.ico".equals(req.getUri())) {
+			FullHttpResponse res = new DefaultFullHttpResponse(HTTP_1_1, NOT_FOUND);
+			sendHttpResponse(ctx, req, res);
+			return;
+		}
 
-        // Send the uppercase string back.
-        String request = ((TextWebSocketFrame) frame).text();
-        System.err.printf("%s received %s%n", ctx.channel(), request);
-        ctx.channel().write(new TextWebSocketFrame(request.toUpperCase()));
-    }
+		// Handshake
+		WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(
+				getWebSocketLocation(req), null, true);
+		handshaker = wsFactory.newHandshaker(req);
+		if (handshaker == null) {
+			WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+		} else {
+			handshaker.handshake(ctx.channel(), req).sync();
+			System.out.println("Server accept handshake");
+		}
+	}
 
-    private static void sendHttpResponse(
-            ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse res) {
-        // Generate an error page if response getStatus code is not OK (200).
-        if (res.getStatus().code() != 200) {
-            ByteBuf buf = Unpooled.copiedBuffer(res.getStatus().toString(), CharsetUtil.UTF_8);
-            res.content().writeBytes(buf);
-            buf.release();
-            HttpHeaders.setContentLength(res, res.content().readableBytes());
-        }
+	private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame) {
 
-        // Send the response and close the connection if necessary.
-        ChannelFuture f = ctx.channel().writeAndFlush(res);
-        if (!HttpHeaders.isKeepAlive(req) || res.getStatus().code() != 200) {
-            f.addListener(ChannelFutureListener.CLOSE);
-        }
-    }
+		// Check for closing frame
+		if (frame instanceof CloseWebSocketFrame) {
+			handshaker.close(ctx.channel(), (CloseWebSocketFrame) frame.retain());
+			return;
+		}
+		if (frame instanceof PingWebSocketFrame) {
+			System.out.println("WebSocket Server received ping");
+			ctx.channel().write(new PongWebSocketFrame(frame.content().retain()));
+			return;
+		}
+		if (!(frame instanceof TextWebSocketFrame)) {
+			throw new UnsupportedOperationException(String.format("%s frame types not supported", frame.getClass()
+					.getName()));
+		}
 
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
-        ctx.close();
-    }
+		// Send the uppercase string back.
+		String request = ((TextWebSocketFrame) frame).text();
+		System.err.printf("%s received %s%n", ctx.channel(), request);
+		try {
+			HeartBeatCommand command = CommandFactory.getInstance(request);
+			if (command.getName().equals(Constants.COMMAND_HEART_BEAT))
+			{
+				ObjectMapper objectMapper = new ObjectMapper();
+				HeartBeatCommand response = new HeartBeatCommand();
+				response.setName(Constants.COMMAND_HEART_BEAT);
+				response.getHeaders().put(Constants.COMMAND_HEADER_SOURCE, command.getHeaders().get(Constants.COMMAND_HEADER_DESTINATION));
+				response.getHeaders().put(Constants.COMMAND_HEADER_DESTINATION, command.getHeaders().get(Constants.COMMAND_HEADER_SOURCE));
+				response.setBody(Constants.COMMAND_HEARTBEAT_MESSAGE);
+				ctx.channel().write(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
+			}
+		} catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+	}
 
-    private String getWebSocketLocation(FullHttpRequest req) {
+	private static void sendHttpResponse(
+			ChannelHandlerContext ctx, FullHttpRequest req, FullHttpResponse res) {
+		// Generate an error page if response getStatus code is not OK (200).
+		if (res.getStatus().code() != 200) {
+			ByteBuf buf = Unpooled.copiedBuffer(res.getStatus().toString(), CharsetUtil.UTF_8);
+			res.content().writeBytes(buf);
+			buf.release();
+			HttpHeaders.setContentLength(res, res.content().readableBytes());
+		}
+
+		// Send the response and close the connection if necessary.
+		ChannelFuture f = ctx.channel().writeAndFlush(res);
+		if (!HttpHeaders.isKeepAlive(req) || res.getStatus().code() != 200) {
+			f.addListener(ChannelFutureListener.CLOSE);
+		}
+	}
+
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+		cause.printStackTrace();
+		ctx.close();
+	}
+
+	private String getWebSocketLocation(FullHttpRequest req) {
 		String ip = System.getenv("OPENSHIFT_INTERNAL_IP");
 		String location =  req.headers().get(HOST) + WEBSOCKET_PATH;
 		if (ip != null)
@@ -161,6 +172,6 @@ public class PingPongServerHandler extends SimpleChannelInboundHandler<Object> {
 		} else {
 			return "ws://" + location;
 		}
-    }
+	}
 
 }

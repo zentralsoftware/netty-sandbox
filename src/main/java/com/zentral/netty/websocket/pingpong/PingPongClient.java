@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
@@ -21,6 +22,8 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 
 import java.net.URI;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class PingPongClient {
 	
@@ -77,10 +80,17 @@ public class PingPongClient {
 			System.out.println("Open connection to " + uri);
 			Channel ch = b.connect(uri.getHost(), port).sync().channel();
             handler.handshakeFuture().sync();
-            Store.getMapInstance().put(uri, handler.getContext());
             System.out.println("Send ping");
             WebSocketFrame frame = new PingWebSocketFrame(Unpooled.wrappedBuffer(new byte[] { 8, 1, 8, 1 }));
-            ch.writeAndFlush(frame);
+            ch.writeAndFlush(frame).sync();
+            ObjectMapper objectMapper = new ObjectMapper();
+			HeartBeatCommand request = new HeartBeatCommand();
+			request.setName(Constants.COMMAND_HEART_BEAT);
+			request.getHeaders().put(Constants.COMMAND_HEADER_SOURCE, getOriginator());
+			request.getHeaders().put(Constants.COMMAND_HEADER_DESTINATION, uri.toString());
+			request.setBody(Constants.COMMAND_HEARTBEAT_MESSAGE);
+            ch.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(request))).sync();
+            
 		} finally {
            // group.shutdownGracefully();
         }
