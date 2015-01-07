@@ -27,6 +27,8 @@ import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
 import io.netty.util.CharsetUtil;
 
+import java.net.URI;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zentral.netty.websocket.WebSocketServerIndexPage;
 
@@ -116,20 +118,32 @@ public class PingPongServerHandler extends SimpleChannelInboundHandler<Object> {
 					.getName()));
 		}
 
-		// Send the uppercase string back.
 		String request = ((TextWebSocketFrame) frame).text();
 		System.err.printf("%s received %s%n", ctx.channel(), request);
 		try {
-			HeartBeatCommand command = CommandFactory.getInstance(request);
-			if (command.getName().equals(Constants.COMMAND_HEART_BEAT))
+			ObjectMapper objectMapper = new ObjectMapper();
+			Command<String> command = CommandFactory.getInstance(request);
+			if (command instanceof HeartBeatCommand)
 			{
-				ObjectMapper objectMapper = new ObjectMapper();
+				// return heartbeat
 				HeartBeatCommand response = new HeartBeatCommand();
-				response.setName(Constants.COMMAND_HEART_BEAT);
+				response.setName(CommandEnum.HEARTBEAT);
 				response.getHeaders().put(Constants.COMMAND_HEADER_SOURCE, command.getHeaders().get(Constants.COMMAND_HEADER_DESTINATION));
 				response.getHeaders().put(Constants.COMMAND_HEADER_DESTINATION, command.getHeaders().get(Constants.COMMAND_HEADER_SOURCE));
 				response.setBody(Constants.COMMAND_HEARTBEAT_MESSAGE);
-				ctx.channel().write(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));
+				ctx.channel().write(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));				
+			} else if (command instanceof JoinCommand)
+			{
+				// add source endpoint into store
+				String source = command.getHeaders().get(Constants.COMMAND_HEADER_SOURCE);
+				URI uri = new URI(source);
+				Store.getMapInstance().put(uri, ctx);
+				// return success
+				SuccessCommand response = new SuccessCommand();
+				ctx.channel().write(new TextWebSocketFrame(objectMapper.writeValueAsString(response)));				
+			} else
+			{
+				
 			}
 		} catch (Exception e)
 		{

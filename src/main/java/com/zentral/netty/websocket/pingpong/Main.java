@@ -20,7 +20,7 @@ public class Main {
 		}		
 		
 		ScheduledExecutorService executorService = Executors.newScheduledThreadPool(3);
-		executorService.scheduleAtFixedRate(new CheckWorker(), 10, 10, TimeUnit.SECONDS);
+		executorService.scheduleAtFixedRate(new CheckWorker(originator), 5, 5, TimeUnit.SECONDS);
 		
 		PingPongServer server = new PingPongServer(originator, host, port, false);
 		server.start();

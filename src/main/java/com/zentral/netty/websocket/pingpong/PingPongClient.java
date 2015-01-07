@@ -3,6 +3,8 @@ package com.zentral.netty.websocket.pingpong;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -34,7 +36,7 @@ public class PingPongClient {
 		this.originator = originator;
 	}
 	
-	public void connect(URI uri) throws Exception
+	public void connect(final URI uri) throws Exception
 	{
 		String scheme = uri.getScheme();
 		final String host = uri.getHost();
@@ -84,13 +86,19 @@ public class PingPongClient {
             WebSocketFrame frame = new PingWebSocketFrame(Unpooled.wrappedBuffer(new byte[] { 8, 1, 8, 1 }));
             ch.writeAndFlush(frame).sync();
             ObjectMapper objectMapper = new ObjectMapper();
-			HeartBeatCommand request = new HeartBeatCommand();
-			request.setName(Constants.COMMAND_HEART_BEAT);
+			JoinCommand request = new JoinCommand();
+			request.setName(CommandEnum.JOIN);
 			request.getHeaders().put(Constants.COMMAND_HEADER_SOURCE, getOriginator());
 			request.getHeaders().put(Constants.COMMAND_HEADER_DESTINATION, uri.toString());
-			request.setBody(Constants.COMMAND_HEARTBEAT_MESSAGE);
-            ch.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(request))).sync();
-            
+            ChannelFuture future = ch.writeAndFlush(new TextWebSocketFrame(objectMapper.writeValueAsString(request)));
+            future.addListener(new ChannelFutureListener() {
+                public void operationComplete(ChannelFuture channelFuture) throws Exception {
+                	if (channelFuture.isSuccess()) {
+                		System.out.println("Successfully join with " + uri);
+                		Store.getMapInstance().put(uri, handler.getContext());
+                	}                	
+                }
+            });
 		} finally {
            // group.shutdownGracefully();
         }

@@ -4,16 +4,16 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public abstract class Command<T> implements Serializable
+public class Command<T> implements Serializable
 {
 	private static final long serialVersionUID = -5785581298237888541L;
-	private String name;
+	private CommandEnum name;
 	private Map<String,String> headers = new HashMap<String,String>();
 	private T body;
-	public String getName() {
+	public CommandEnum getName() {
 		return name;
 	}
-	public void setName(String name) {
+	public void setName(CommandEnum name) {
 		this.name = name;
 	}
 	public Map<String, String> getHeaders() {
