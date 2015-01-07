@@ -4,6 +4,9 @@
 	<groupId>netty-sandbox</groupId>
 	<artifactId>netty-sandbox</artifactId>
 	<version>0.0.1</version>
+	<properties>
+		<jackson.version>2.4.4</jackson.version>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>log4j</groupId>
@@ -26,6 +29,16 @@
 			<artifactId>netty-all</artifactId>
 			<version>4.0.24.Final</version>
 		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+			<version>${jackson.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>${jackson.version}</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
@@ -40,7 +53,7 @@
 						</manifest>
 					</archive>
 				</configuration>
-			</plugin>		
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
